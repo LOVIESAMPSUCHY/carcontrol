@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Symulacja 3D Auta z Padem — Mateusz</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: #000;
+    }
+
+    #hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #0f0;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px 15px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 10;
+    }
+
+    #hud span {
+      display: block;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <span id="pad-status">🎮 Oczekiwanie na pada...</span>
+    <span id="speed">🚗 Prędkość: 0.00</span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+  <script>
+    // Inicjalizacja sceny
+    const scene = new THREE.Scene();
+
+    // Tło (symulacja nieba)
+    const gradient = new THREE.Color(0x1a1a2e);
+    const horizon = new THREE.Color(0x16213e);
+    scene.background = gradient;
+
+    const camera = new THREE.PerspectiveCamera(
+      75, window.innerWidth / window.innerHeight, 0.1, 1000
+    );
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // Światła
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambient);
+
+    const directional = new THREE.DirectionalLight(0xffffff, 1);
+    directional.position.set(5, 10, 5);
+    directional.castShadow = true;
+    scene.add(directional);
+
+    // Tor
+    const road = new THREE.Mesh(
+      new THREE.PlaneGeometry(500, 500),
+      new THREE.MeshStandardMaterial({ color: 0x2e2e2e })
+    );
+    road.rotation.x = -Math.PI / 2;
+    road.receiveShadow = true;
+    scene.add(road);
+
+    // Auto
+    const carGeometry = new THREE.BoxGeometry(2, 0.5, 4);
+    const carMaterial = new THREE.MeshStandardMaterial({ color: 0xff4444, metalness: 0.6, roughness: 0.4 });
+    const car = new THREE.Mesh(carGeometry, carMaterial);
+    car.position.y = 0.25;
+    car.castShadow = true;
+    scene.add(car);
+
+    // Kamera startowa
+    camera.position.set(0, 6, -10);
+    camera.lookAt(car.position);
+
+    // HUD
+    const padStatus = document.getElementById('pad-status');
+    const speedDisplay = document.getElementById('speed');
+
+    // Fizyka jazdy
+    let velocity = 0;
+    let angle = 0;
+    const maxSpeed = 0.2;
+    const turnSpeed = 0.035;
+
+    function updateGamepad() {
+      const gp = navigator.getGamepads()[0];
+      if (gp) {
+        const forward = -gp.axes[1];
+        const turn = gp.axes[2];
+
+        velocity = forward * maxSpeed;
+        angle += turn * turnSpeed;
+
+        car.rotation.y = angle;
+        car.position.x += Math.sin(angle) * velocity;
+        car.position.z += Math.cos(angle) * velocity;
+
+        padStatus.textContent = `🎮 Pad: ${gp.id}`;
+        speedDisplay.textContent = `🚗 Prędkość: ${(velocity * 50).toFixed(2)}`;
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      updateGamepad();
+
+      // Smooth kamera follow
+      const targetX = car.position.x - Math.sin(angle) * 10;
+      const targetZ = car.position.z - Math.cos(angle) * 10;
+      const camHeight = 6;
+
+      camera.position.x += (targetX - camera.position.x) * 0.05;
+      camera.position.z += (targetZ - camera.position.z) * 0.05;
+      camera.position.y += (camHeight - camera.position.y) * 0.05;
+      camera.lookAt(car.position);
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener("gamepadconnected", e => {
+      padStatus.textContent = "🎮 Pad podłączony: " + e.gamepad.id;
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
